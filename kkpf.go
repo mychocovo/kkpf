@@ -45,14 +45,15 @@ var konum = map[rune]int{
 }
 
 var replaceMap = map[string]string{
-	"승": "s", "ㅅ": "s",
+	"승": "s", "ㅅ": "s", "언더" : "s",
 	"무": "d", "ㅁ": "d", "ㅇ": "d",
-	"패": "f", "ㅍ": "f", "ㅂ": "f",
+	"패": "f", "ㅍ": "f", "ㅂ": "f", "오버" : "f",
+	"먄": "만",
 }
 
 var sdfMap = map[string]string{"s": "승", "d": "무", "f": "패"}
-var miscrx = regexp.MustCompile(`,|\.|ㅈ|\s`)
-var pprx = regexp.MustCompile(`ㅅ|ㅁ|ㅇ|ㅍ|ㅂ|승|무|패`)
+var miscrx = regexp.MustCompile(`-|\\|,|\.|ㅈ|\s`)
+var pprx = regexp.MustCompile(`ㅅ|ㅁ|ㅇ|ㅍ|ㅂ|승|무|패|(언더)|(오버)|먄`)
 var nsdfrx = regexp.MustCompile(`s|d|f`)
 var sdfrx = regexp.MustCompile(`\d+(s|d|f)`)
 var monrx = regexp.MustCompile(`(\d{1,}000원{0,})|((.*만)(.*천){0,}원{0,})|(.*천)원{0,}|(\d{1,})`)
@@ -91,8 +92,14 @@ func (q ConQ) Add(s string) {
 
 var ss = make([]string, 0)
 var cq ConQ
+var conn net.Conn
+var err error
 
 func process(in string) (string, bool) {
+	if strings.Index(in, "ㄹ") == 0 {
+		conn.Close()
+		return "접속 초기화", true
+	}
 	johab := strings.Index(in, "ㅈ")
 	message := ""
 	state := ""
@@ -183,6 +190,8 @@ func process(in string) (string, bool) {
 	}
 	if right {
 		cq.Add(state)
+	} else {
+		message = in
 	}
 	return message, right
 }
@@ -196,11 +205,11 @@ func apiMessageHandler(w http.ResponseWriter, r *http.Request) {
 	for i, s := range strings.Split(reqMsg.Content, "\n") {
 		content, isCorrect := process(s)
 		if len(s) > 0 {
-			if i > 0 { sends += "\n=============================\n" }
-			if !isCorrect {
-				sends += "잘못된 입력입니다."
-			} else {
+			if i > 0 { sends += "\n========================\n" }
+			if isCorrect {
 				sends += content
+			} else {
+				sends += "인식 실패(" + content + ")"
 			}
 		}
 	}
@@ -230,7 +239,7 @@ func main() {
 			os.Exit(1)
 		}
 		for {
-			conn, err := ln.Accept()
+			conn, err = ln.Accept()
 			defer conn.Close()
 			if err != nil {
 				os.Exit(1)
